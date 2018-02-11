@@ -1,0 +1,6 @@
+#!/bin/sh
+
+while true; do
+  inotifywait -qq -e modify -e create -e delete -r src
+  elm make --output elm.js src/Dashboard.elm --debug
+done
