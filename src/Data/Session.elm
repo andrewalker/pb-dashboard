@@ -4,4 +4,4 @@ import Data.User exposing (User)
 
 
 type alias Session =
-    { user : User }
+    { user : Maybe User }

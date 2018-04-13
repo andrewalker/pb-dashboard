@@ -6,7 +6,9 @@ import Page.Posts as Posts
 import Page.NewPost as NewPost
 import Page.Errored as Errored exposing (PageLoadError)
 import Data.Session exposing (Session)
-import Data.User as User
+import Data.User exposing (User)
+import Request.User as RU
+import Http
 import Task
 import Views.Page as Page exposing (ActivePage)
 import Ports exposing (mkEditor, rmEditor)
@@ -43,10 +45,14 @@ type alias Model =
 
 init : Location -> ( Model, Cmd Msg )
 init location =
-    setRoute (Route.fromLocation location)
-        { pageState = Loaded initialPage
-        , session = { user = { id = 1, name = "André Walker", isConfirmed = False } }
-        }
+    let
+        ( m1, c1 ) =
+            setRoute (Route.fromLocation location)
+                { pageState = Loaded initialPage
+                , session = { user = Nothing }
+                }
+    in
+        ( m1, Cmd.batch [ (Http.send UserSessionLoaded RU.get), c1 ] )
 
 
 initialPage : Page
@@ -62,10 +68,21 @@ view : Model -> Html Msg
 view model =
     case model.pageState of
         Loaded page ->
-            viewPage model.session False page
+            viewPageIfLoggedIn model.session False page
 
         TransitioningFrom page ->
-            viewPage model.session True page
+            viewPageIfLoggedIn model.session True page
+
+
+viewPageIfLoggedIn : Session -> Bool -> Page -> Html Msg
+viewPageIfLoggedIn session isLoading page =
+    case session.user of
+        Nothing ->
+            Html.text "No session"
+                |> Page.frame isLoading session Page.Other
+
+        Just _ ->
+            viewPage session isLoading page
 
 
 viewPage : Session -> Bool -> Page -> Html Msg
@@ -125,6 +142,7 @@ getPage pageState =
 
 type Msg
     = SetRoute (Maybe Route)
+    | UserSessionLoaded (Result Http.Error User)
     | PostsLoaded (Result PageLoadError Posts.Model)
     | PostsMsg Posts.Msg
     | NewPostMsg NewPost.Msg
@@ -171,6 +189,12 @@ updatePage page msg model =
                 ( { model | pageState = Loaded (toModel newModel) }, Cmd.map toMsg newCmd )
     in
         case ( msg, page ) of
+            ( UserSessionLoaded (Ok u), _ ) ->
+                ( { model | session = { user = Just u } }, Cmd.none )
+
+            ( UserSessionLoaded (Err _), _ ) ->
+                ( { model | session = { user = Nothing } }, Cmd.none )
+
             ( SetRoute route, _ ) ->
                 setRoute route model
 
