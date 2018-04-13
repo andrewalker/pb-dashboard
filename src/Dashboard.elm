@@ -4,12 +4,14 @@ import Html exposing (..)
 import Navigation exposing (Location)
 import Page.Posts as Posts
 import Page.NewPost as NewPost
+import Page.Errored as Errored exposing (PageLoadError)
 import Data.Session exposing (Session)
 import Data.User as User
 import Task
+import Views.Page as Page exposing (ActivePage)
+import Ports exposing (mkEditor, rmEditor)
 
 
--- import Page.Errored as Errored exposing (PageLoadError)
 -- import Page.Settings as Settings
 
 import Route exposing (Route)
@@ -18,6 +20,8 @@ import Views.Page as Page
 
 type Page
     = Blank
+    | NotFound
+    | Errored PageLoadError
     | Posts Posts.Model
     | NewPost NewPost.Model
 
@@ -77,6 +81,14 @@ viewPage session isLoading page =
                 Html.text ""
                     |> frame Page.Other
 
+            NotFound ->
+                Html.text "Not Found!"
+                    |> frame Page.Other
+
+            Errored subModel ->
+                Errored.view subModel
+                    |> frame Page.Posts
+
             Posts subModel ->
                 Posts.view session subModel
                     |> frame Page.Posts
@@ -113,24 +125,34 @@ getPage pageState =
 
 type Msg
     = SetRoute (Maybe Route)
+    | PostsLoaded (Result PageLoadError Posts.Model)
     | PostsMsg Posts.Msg
     | NewPostMsg NewPost.Msg
 
 
 setRoute : Maybe Route -> Model -> ( Model, Cmd Msg )
 setRoute maybeRoute model =
-    case maybeRoute of
-        Nothing ->
-            ( { model | pageState = Loaded Blank }, Cmd.none )
+    let
+        transition toMsg task =
+            ( { model | pageState = TransitioningFrom (getPage model.pageState) }
+            , Cmd.batch [ rmEditor (Just "mdEditor"), Task.attempt toMsg task ]
+            )
 
-        Just Route.Posts ->
-            ( { model | pageState = Loaded (Posts Posts.initialModel) }, Cmd.none )
+        errored =
+            pageErrored model
+    in
+        case maybeRoute of
+            Nothing ->
+                ( { model | pageState = Loaded Blank }, Cmd.none )
 
-        Just Route.NewPost ->
-            ( { model | pageState = Loaded (NewPost NewPost.initialModel) }, Cmd.none )
+            Just Route.Posts ->
+                transition PostsLoaded Posts.init
 
-        _ ->
-            ( { model | pageState = Loaded Blank }, Cmd.none )
+            Just Route.NewPost ->
+                ( { model | pageState = Loaded (NewPost NewPost.initialModel) }, mkEditor (Just "fooText") )
+
+            _ ->
+                ( { model | pageState = Loaded Blank }, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -152,15 +174,55 @@ updatePage page msg model =
             ( SetRoute route, _ ) ->
                 setRoute route model
 
+            ( PostsLoaded (Ok subModel), _ ) ->
+                ( { model | pageState = Loaded (Posts subModel) }, Cmd.none )
+
+            ( PostsLoaded (Err error), _ ) ->
+                ( { model | pageState = Loaded (Errored error) }, Cmd.none )
+
             ( PostsMsg subMsg, Posts subModel ) ->
                 toPage Posts PostsMsg Posts.update subMsg subModel
 
             ( NewPostMsg subMsg, NewPost subModel ) ->
                 toPage NewPost NewPostMsg NewPost.update subMsg subModel
 
+            ( _, NotFound ) ->
+                -- Disregard incoming messages that arrived from NotFound page
+                ( model, Cmd.none )
+
             ( _, _ ) ->
                 -- Disregard incoming messages that arrived for the wrong page
                 ( model, Cmd.none )
+
+
+pageErrored : Model -> ActivePage -> String -> ( Model, Cmd msg )
+pageErrored model activePage errorMessage =
+    let
+        error =
+            Errored.pageLoadError activePage errorMessage
+    in
+        ( { model | pageState = Loaded (Errored error) }, Cmd.none )
+
+
+subscriptions : Model -> Sub Msg
+subscriptions model =
+    Sub.batch
+        [ pageSubscriptions (getPage model.pageState)
+        ]
+
+
+pageSubscriptions : Page -> Sub Msg
+pageSubscriptions page =
+    case page of
+        Posts model ->
+            let
+                lastItemVisibleToMsg () =
+                    PostsMsg (Posts.LastItemVisible)
+            in
+                Ports.lastItemVisible lastItemVisibleToMsg
+
+        _ ->
+            Sub.none
 
 
 
@@ -173,5 +235,5 @@ main =
         { init = init
         , view = view
         , update = update
-        , subscriptions = (\_ -> Sub.none)
+        , subscriptions = subscriptions
         }

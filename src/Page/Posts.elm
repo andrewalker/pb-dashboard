@@ -4,6 +4,14 @@ import Html exposing (..)
 import Html.Events exposing (..)
 import Html.Attributes exposing (..)
 import Data.Session exposing (Session)
+import Json.Decode as Decode exposing (int, string, Decoder)
+import Json.Decode.Pipeline exposing (decode, required)
+import Page.Errored exposing (PageLoadError, pageLoadError)
+import Task exposing (Task)
+import Views.Page as Page
+import Time exposing (Time)
+import Process
+import Http
 
 
 -- MODEL
@@ -22,23 +30,31 @@ type alias Post =
     }
 
 
+type GetPostsStatus
+    = Unattempted
+    | Loading
+    | GotOk
+    | GotError String
+
+
 type alias Model =
     { posts : List Post
+    , status : GetPostsStatus
     }
 
 
-initialModel : Model
-initialModel =
-    { posts =
-        [ { id = 7, title = "My Post Title 7", content = loremIpsum, date = "just now" }
-        , { id = 6, title = "My Post Title 6", content = loremIpsum, date = "3 days ago" }
-        , { id = 5, title = "My Post Title 5", content = loremIpsum, date = "1 week ago" }
-        , { id = 4, title = "My Post Title 4", content = loremIpsum, date = "2 weeks ago" }
-        , { id = 3, title = "My Post Title 3", content = loremIpsum, date = "2 weeks ago" }
-        , { id = 2, title = "My Post Title 2", content = loremIpsum, date = "1 month ago" }
-        , { id = 1, title = "My Post Title 1", content = loremIpsum, date = "1 month ago" }
-        ]
-    }
+init : Task PageLoadError Model
+init =
+    let
+        loadPosts =
+            getPosts_
+                |> Http.toTask
+
+        handleLoadError _ =
+            pageLoadError Page.Posts "Posts are currently unavailable."
+    in
+        Task.map2 Model loadPosts (Task.succeed GotOk)
+            |> Task.mapError handleLoadError
 
 
 
@@ -47,16 +63,97 @@ initialModel =
 
 type Msg
     = Sort PostSorting
+    | LastItemVisible
+    | GetPosts
+    | GetMorePosts
+    | GotPosts (Result Http.Error (List Post))
+    | GotMorePosts (Result Http.Error (List Post))
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
+        GetPosts ->
+            ( model, getPosts )
+
+        GetMorePosts ->
+            ( model, getMorePosts )
+
+        LastItemVisible ->
+            ( { model | status = Loading }
+            , if model.status == Loading then
+                Cmd.none
+              else
+                delay (Time.second * 5) <| GetMorePosts
+            )
+
+        GotMorePosts (Ok newPosts) ->
+            ( { model | posts = (List.append model.posts newPosts), status = GotOk }, Cmd.none )
+
+        GotMorePosts (Err (Http.BadPayload msg _)) ->
+            ( { model | status = GotError msg }, Cmd.none )
+
+        GotMorePosts (Err _) ->
+            ( { model | status = GotError "there is something off with the request" }, Cmd.none )
+
+        GotPosts (Ok newPosts) ->
+            ( { model | posts = newPosts, status = GotOk }, Cmd.none )
+
+        GotPosts (Err (Http.BadPayload msg _)) ->
+            ( { model | status = GotError msg, posts = [] }, Cmd.none )
+
+        GotPosts (Err _) ->
+            ( { model | status = GotError "there is something off with the request", posts = [] }, Cmd.none )
+
         Sort DateAsc ->
             ( { model | posts = List.sortBy .id model.posts }, Cmd.none )
 
         Sort DateDesc ->
             ( { model | posts = List.sortBy .id model.posts |> List.reverse }, Cmd.none )
+
+
+delay : Time.Time -> msg -> Cmd msg
+delay time msg =
+    Process.sleep time
+        |> Task.perform (\_ -> msg)
+
+
+getPosts : Cmd Msg
+getPosts =
+    let
+        url =
+            "/posts.json"
+
+        request =
+            Http.get url (Decode.field "posts" (Decode.list decodePost))
+    in
+        Http.send GotPosts request
+
+
+getMorePosts : Cmd Msg
+getMorePosts =
+    let
+        url =
+            "/posts.json"
+
+        request =
+            Http.get url (Decode.field "posts" (Decode.list decodePost))
+    in
+        Http.send GotMorePosts request
+
+
+getPosts_ : Http.Request (List Post)
+getPosts_ =
+    Http.get "/posts.json" (Decode.field "posts" (Decode.list decodePost))
+
+
+decodePost : Decoder Post
+decodePost =
+    decode Post
+        |> Json.Decode.Pipeline.required "id" int
+        |> Json.Decode.Pipeline.required "title" string
+        |> Json.Decode.Pipeline.required "content" string
+        |> Json.Decode.Pipeline.required "date" string
 
 
 
@@ -75,14 +172,35 @@ view session model =
                 ]
             ]
         , h1 [ class "ml-4" ] [ text "Posts" ]
-        , div [ class "list-group list-group-flush ml-1" ]
+        , viewStatus model.status
+        , div [ class "list-group list-group-flush ml-1 list-posts" ]
             (List.map
                 viewPost
                 model.posts
             )
-        , p [ class "text-center m-5" ]
-            [ img [ src "spinner.svg", style [ ( "height", "25px" ), ( "width", "25px" ) ] ] [] ]
+        , if model.status == Loading then
+            p [ class "text-center m-5" ]
+                [ img [ src "spinner.svg", style [ ( "height", "25px" ), ( "width", "25px" ) ] ] []
+                ]
+          else
+            text ""
         ]
+
+
+viewStatus : GetPostsStatus -> Html Msg
+viewStatus status =
+    case status of
+        Unattempted ->
+            text ""
+
+        Loading ->
+            text ""
+
+        GotOk ->
+            text ""
+
+        GotError msg ->
+            h3 [] [ text ("Sorry! " ++ msg) ]
 
 
 viewPost : Post -> Html Msg
@@ -94,8 +212,3 @@ viewPost post =
             ]
         , p [] [ text post.content ]
         ]
-
-
-loremIpsum : String
-loremIpsum =
-    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed eu erat eget metus molestie lacinia. Pellentesque sed imperdiet orci. Cras tellus nibh, varius sed interdum a, rhoncus quis libero. Duis in libero metus. Praesent diam elit, elementum eu pretium vel, molestie id odio. In vitae vestibulum ante, at porta sapien. Nulla tellus ligula, lacinia id molestie vitae, fermentum vel arcu. Nunc lobortis volutpat lacus at feugiat. Nam fermentum in dolor pretium rutrum. Aenean molestie in urna sed interdum. Integer at neque auctor, interdum enim nec, aliquet justo. In faucibus orci blandit maximus fermentum. Etiam luctus libero eu orci condimentum, at viverra lectus fermentum. Fusce non augue eros. Praesent sit amet congue dolor. Vivamus erat mauris, tempus sit amet libero vitae, vestibulum porttitor nulla."
