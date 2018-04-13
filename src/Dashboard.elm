@@ -149,7 +149,7 @@ setRoute maybeRoute model =
                 transition PostsLoaded Posts.init
 
             Just Route.NewPost ->
-                ( { model | pageState = Loaded (NewPost NewPost.initialModel) }, mkEditor (Just "fooText") )
+                ( { model | pageState = Loaded (NewPost NewPost.initialModel) }, mkEditor (Just "mdEditor") )
 
             _ ->
                 ( { model | pageState = Loaded Blank }, Cmd.none )
