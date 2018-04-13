@@ -4,6 +4,7 @@ import Html exposing (Attribute)
 import Html.Attributes as Attr
 import Navigation exposing (Location)
 import UrlParser as Url exposing ((</>), Parser, oneOf, parseHash, s, string)
+import Data.Post exposing (slugParser, slugToString, Slug)
 
 
 -- ROUTING --
@@ -13,6 +14,7 @@ type Route
     = Posts
     | Settings
     | NewPost
+    | EditPost Slug
 
 
 route : Parser (Route -> a) a
@@ -21,6 +23,7 @@ route =
         [ Url.map Posts (s "")
         , Url.map Settings (s "settings")
         , Url.map NewPost (s "new")
+        , Url.map EditPost (s "edit" </> slugParser)
         ]
 
 
@@ -41,6 +44,9 @@ routeToString page =
 
                 NewPost ->
                     [ "new" ]
+
+                EditPost slug ->
+                    [ "edit", slugToString slug ]
     in
         "#/" ++ String.join "/" pieces
 

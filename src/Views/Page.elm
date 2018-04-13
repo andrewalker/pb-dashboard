@@ -8,6 +8,7 @@ import Html.Attributes exposing (..)
 import Route exposing (Route)
 import Data.Session exposing (Session)
 import Data.User exposing (User)
+import Data.Post exposing (Slug)
 import Feather
 
 
@@ -22,6 +23,7 @@ type ActivePage
     = Other
     | Settings
     | NewPost
+    | EditPost Slug
     | Posts
 
 
@@ -114,6 +116,9 @@ isActive : ActivePage -> Route -> Bool
 isActive page route =
     case ( page, route ) of
         ( NewPost, Route.NewPost ) ->
+            True
+
+        ( EditPost _, Route.EditPost _ ) ->
             True
 
         ( Posts, Route.Posts ) ->

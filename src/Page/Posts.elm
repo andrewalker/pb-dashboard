@@ -10,6 +10,8 @@ import Page.Errored exposing (PageLoadError, pageLoadError)
 import Task exposing (Task)
 import Views.Page as Page
 import Time exposing (Time)
+import Data.Post exposing (Post)
+import Route
 import Process
 import Http
 
@@ -20,14 +22,6 @@ import Http
 type PostSorting
     = DateAsc
     | DateDesc
-
-
-type alias Post =
-    { id : Int
-    , title : String
-    , content : String
-    , date : String
-    }
 
 
 type GetPostsStatus
@@ -125,7 +119,7 @@ getPosts =
             "/posts.json"
 
         request =
-            Http.get url (Decode.field "posts" (Decode.list decodePost))
+            Http.get url (Decode.field "posts" (Decode.list Data.Post.decoder))
     in
         Http.send GotPosts request
 
@@ -137,23 +131,14 @@ getMorePosts =
             "/posts.json"
 
         request =
-            Http.get url (Decode.field "posts" (Decode.list decodePost))
+            Http.get url (Decode.field "posts" (Decode.list Data.Post.decoder))
     in
         Http.send GotMorePosts request
 
 
 getPosts_ : Http.Request (List Post)
 getPosts_ =
-    Http.get "/posts.json" (Decode.field "posts" (Decode.list decodePost))
-
-
-decodePost : Decoder Post
-decodePost =
-    decode Post
-        |> Json.Decode.Pipeline.required "id" int
-        |> Json.Decode.Pipeline.required "title" string
-        |> Json.Decode.Pipeline.required "content" string
-        |> Json.Decode.Pipeline.required "date" string
+    Http.get "/posts.json" (Decode.field "posts" (Decode.list Data.Post.decoder))
 
 
 
@@ -205,7 +190,7 @@ viewStatus status =
 
 viewPost : Post -> Html Msg
 viewPost post =
-    a [ href "javascript:void(0)", class "list-group-item list-group-item-action" ]
+    a [ Route.href (Route.EditPost post.slug), class "list-group-item list-group-item-action" ]
         [ div [ class "d-flex justify-content-between" ]
             [ h5 [] [ text post.title ]
             , small [] [ em [ class "text-muted" ] [ text post.date ] ]
