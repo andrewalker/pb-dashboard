@@ -24,7 +24,7 @@ type alias Post =
     , id : Int
     , title : String
     , content : String
-    , description : String
+    , excerpt : String
     , tags : List String
     , date : String
     }
@@ -37,6 +37,6 @@ decoder =
         |> Json.Decode.Pipeline.required "id" int
         |> Json.Decode.Pipeline.required "title" string
         |> Json.Decode.Pipeline.required "content" string
-        |> Json.Decode.Pipeline.required "description" string
+        |> Json.Decode.Pipeline.required "excerpt" string
         |> Json.Decode.Pipeline.required "tags" (Decode.list string)
         |> Json.Decode.Pipeline.required "date" string

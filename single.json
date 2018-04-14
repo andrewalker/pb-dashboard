@@ -5,7 +5,7 @@
         "title": "My Post Title 7",
         "content": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed eu erat eget metus molestie lacinia. Pellentesque sed imperdiet orci. Cras tellus nibh, varius sed interdum a, rhoncus quis libero. Duis in libero metus. Praesent diam elit, elementum eu pretium vel, molestie id odio. In vitae vestibulum ante, at porta sapien. Nulla tellus ligula, lacinia id molestie vitae, fermentum vel arcu. Nunc lobortis volutpat lacus at feugiat. Nam fermentum in dolor pretium rutrum. Aenean molestie in urna sed interdum. Integer at neque auctor, interdum enim nec, aliquet justo. In faucibus orci blandit maximus fermentum. Etiam luctus libero eu orci condimentum, at viverra lectus fermentum. Fusce non augue eros. Praesent sit amet congue dolor. Vivamus erat mauris, tempus sit amet libero vitae, vestibulum porttitor nulla.",
         "date": "just now",
-        "description": "dunno..",
+        "excerpt": "dunno..",
         "tags": ["cats", "mouse"]
     }
 }
