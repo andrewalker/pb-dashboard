@@ -41,7 +41,7 @@ frame _ session activePage content =
                     [ img
                         [ class "align-self-center m-2"
                         , style [ ( "width", "75px" ), ( "height", "75px" ) ]
-                        , src "camel-silhouette.png"
+                        , src "/images/camel-silhouette.png"
                         ]
                         []
                     , div [ class "media-body" ]
